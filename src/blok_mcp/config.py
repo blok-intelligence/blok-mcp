@@ -36,6 +36,15 @@ class MCPConfig(BaseSettings):
     # Enable debug logging
     debug: bool = False
 
+    # Pre-configured access token (optional - skips authentication)
+    # Get this by running: curl -s -X POST https://app.joinblok.co/api/v1/auth/signin \
+    #   -H 'Content-Type: application/json' -d '{"email":"...","password":"..."}' | jq -r '.access_token'
+    access_token: str = ""
+
+    # Pre-configured credentials (optional - auto-authenticates on startup)
+    email: str = ""
+    password: str = ""
+
     class Config:
         env_prefix = "BLOK_MCP_"
         # Don't load from .env file to avoid conflicts with main backend .env

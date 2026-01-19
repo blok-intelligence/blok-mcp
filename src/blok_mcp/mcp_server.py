@@ -27,11 +27,18 @@ logger = logging.getLogger(__name__)
 class BlokMCPServer:
     """MCP server for Blok experiments."""
 
-    def __init__(self, pre_auth_token: Optional[str] = None):
+    def __init__(
+        self,
+        pre_auth_token: Optional[str] = None,
+        auto_auth_email: Optional[str] = None,
+        auto_auth_password: Optional[str] = None,
+    ):
         """Initialize the MCP server.
 
         Args:
             pre_auth_token: Optional pre-supplied access token to skip authentication
+            auto_auth_email: Optional email for auto-authentication on startup
+            auto_auth_password: Optional password for auto-authentication on startup
         """
         # Initialize server with explicit name
         self.server = Server("blok-experiments")
@@ -40,9 +47,16 @@ class BlokMCPServer:
             blok_api_url=config.blok_api_url,
         )
 
-        # If pre-auth token provided, set it up
+        # Store credentials for auto-auth (will authenticate on first API call)
+        self._auto_auth_email = auto_auth_email
+        self._auto_auth_password = auto_auth_password
+
+        # If pre-auth token provided, set it up immediately
         if pre_auth_token:
+            logger.info("Using pre-configured access token")
             self.session_manager.set_token(pre_auth_token)
+        elif auto_auth_email and auto_auth_password:
+            logger.info(f"Auto-authentication configured for {auto_auth_email}")
 
         # Store active ngrok tunnels
         self.ngrok_tunnels: dict[str, Any] = {}  # port -> tunnel object
@@ -428,11 +442,18 @@ Session active. Future tool calls will use this session automatically."""
         if self.session_manager.is_authenticated:
             return True
 
+        # Try credentials from arguments first
         email = arguments.get("email")
         password = arguments.get("password")
 
+        # Fall back to auto-auth credentials from config
+        if not email or not password:
+            email = self._auto_auth_email
+            password = self._auto_auth_password
+
         if email and password:
             try:
+                logger.info(f"Authenticating as {email}...")
                 await self.session_manager.authenticate_async(email, password)
                 return True
             except AuthenticationError as e:
